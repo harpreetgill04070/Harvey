@@ -37,7 +37,7 @@ text_chunks = create_chunks(documents)
 
 
 #Step 3: Setup Embeddings Model (Use DeepSeek R1 with Ollama)
-ollama_model_name="deepseek-r1:14b"
+ollama_model_name="deepseek-r1:1.5b"
 def get_embedding_model(ollama_model_name):
     embeddings = OllamaEmbeddings(model=ollama_model_name)
     return embeddings

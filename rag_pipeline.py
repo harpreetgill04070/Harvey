@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+import os
+load_dotenv()
 from langchain_groq import ChatGroq
 from vector_database import faiss_db
 from langchain_core.prompts import ChatPromptTemplate
@@ -38,3 +41,6 @@ def answer_query(documents, model, query):
 #question="If a government forbids the right to assemble peacefully which articles are violated and why?"
 #retrieved_docs=retrieve_docs(question)
 #print("AI Lawyer: ",answer_query(documents=retrieved_docs, model=llm_model, query=question))
+
+
+
