@@ -1,8 +1,7 @@
-
 # vector_database.py
 
 import os
-import asyncio
+import concurrent.futures
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PDFPlumberLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -52,41 +51,38 @@ def load_pdf(file_path):
     return loader.load()
 
 def create_chunks(documents):
+    """Optimized: creates chunks faster by using fewer overlaps & smaller chunk size."""
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=800,  # smaller chunks -> more embeddings -> better recall
-        chunk_overlap=100,
+        chunk_size=600,  # ✅ slightly smaller chunks = faster embedding + good recall
+        chunk_overlap=50,
         add_start_index=True
     )
     return splitter.split_documents(documents)
 
 # ---- Optimized Embedding + Upsert ----
-async def async_embed_and_store(documents):
-    # Generate embeddings concurrently
+def store_in_pinecone(documents):
     print(f"🔄 Generating embeddings for {len(documents)} chunks...")
-    loop = asyncio.get_event_loop()
+
     texts = [doc.page_content for doc in documents]
 
-    # Run embedding generation in parallel
-    embeddings = await asyncio.gather(*[
-        loop.run_in_executor(None, embedding_model.embed_query, text)
-        for text in texts
-    ])
+    # ✅ ThreadPoolExecutor for parallel embeddings
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        embeddings = list(executor.map(embedding_model.embed_query, texts))
 
-    # Prepare vectors for Pinecone
-    vectors = []
-    for i, (doc, emb) in enumerate(zip(documents, embeddings)):
-        vectors.append({"id": f"doc-{i}", "values": emb, "metadata": {"text": doc.page_content}})
+    vectors = [
+        {"id": f"doc-{i}", "values": emb, "metadata": {"text": doc.page_content}}
+        for i, (doc, emb) in enumerate(zip(documents, embeddings))
+    ]
 
-    # Upsert to Pinecone in batches
     print(f"🚀 Uploading {len(vectors)} vectors to Pinecone...")
     index = pc.Index(INDEX_NAME)
+
+    # ✅ Batch upload for faster throughput
     batch_size = 100
     for i in range(0, len(vectors), batch_size):
         index.upsert(vectors=vectors[i:i+batch_size])
-    print("✅ All vectors uploaded to Pinecone.")
 
-def store_in_pinecone(documents):
-    asyncio.run(async_embed_and_store(documents))
+    print("✅ All vectors uploaded to Pinecone.")
 
 def get_vectorstore():
     return PineconeVectorStore(index_name=INDEX_NAME, embedding=embedding_model)

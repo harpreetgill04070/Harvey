@@ -1,10 +1,9 @@
 
-
 import os
 import streamlit as st
 import time
 from vector_database import upload_pdf, load_pdf, create_chunks, store_in_pinecone
-from rag_pipeline import answer_query, retrieve_docs, llm_model
+from rag_pipeline import answer_query  # ✅ removed retrieve_docs, llm_model import
 
 st.set_page_config(page_title="AI Lawyer Chatbot", layout="wide")
 st.sidebar.title("📜 Chat History")
@@ -64,13 +63,14 @@ if prompt:
             placeholder = st.empty()
             full_response = ""
 
-            docs = retrieve_docs(prompt)
-            if not docs:
-                placeholder.markdown("⚠️ No results found. Try re-uploading your PDF.")
-            else:
-                response = answer_query(docs, llm_model, prompt)
-                response_text = response.content if hasattr(response, "content") else str(response)
+            # ✅ FIX: call answer_query with just the query
+            response = answer_query(prompt)
+            response_text = response.content if hasattr(response, "content") else str(response)
 
+            # ✅ Show proper message if unrelated to law
+            if "I am a legal assistant and can only answer law-related questions." in response_text:
+                placeholder.markdown("⚠️ This question is outside my legal expertise.")
+            else:
                 for word in response_text.split():
                     full_response += word + " "
                     time.sleep(0.01)  # faster streaming
