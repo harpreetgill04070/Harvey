@@ -1,46 +1,41 @@
+
+
 from dotenv import load_dotenv
-import os
 load_dotenv()
+
 from langchain_groq import ChatGroq
-from vector_database import faiss_db
 from langchain_core.prompts import ChatPromptTemplate
+from vector_database import get_vectorstore
 
-# Uncomment the following if you're NOT using pipenv
-#from dotenv import load_dotenv
-#load_dotenv()
+llm_model = ChatGroq(model="deepseek-r1-distill-llama-70b")
 
-#Step1: Setup LLM (Use DeepSeek R1 with Groq)
-llm_model=ChatGroq(model="deepseek-r1-distill-llama-70b")
-
-#Step2: Retrieve Docs
-
-def retrieve_docs(query):
-    return faiss_db.similarity_search(query)
+def retrieve_docs(query, k=4):
+    try:
+        print(f"🔍 Querying Pinecone for: {query}")
+        vectorstore = get_vectorstore()
+        results = vectorstore.similarity_search(query, k=k)
+        print(f"✅ Retrieved {len(results)} relevant chunks.")
+        return results
+    except Exception as e:
+        print(f"❌ Retrieval failed: {e}")
+        return []
 
 def get_context(documents):
-    context = "\n\n".join([doc.page_content for doc in documents])
-    return context
-
-#Step3: Answer Question
+    return "\n\n".join([doc.page_content for doc in documents])
 
 custom_prompt_template = """
-Use the pieces of information provided in the context to answer user's question.
-If you dont know the answer, just say that you dont know, dont try to make up an answer. 
-Dont provide anything out of the given context
-Question: {question} 
-Context: {context} 
+Use only the context below to answer the question.
+If the context doesn't contain the answer, say "I don't know".
+
+Question: {question}
+Context: {context}
 Answer:
 """
 
 def answer_query(documents, model, query):
     context = get_context(documents)
+    if not context.strip():
+        return "⚠️ No context found. Try re-uploading your file."
     prompt = ChatPromptTemplate.from_template(custom_prompt_template)
     chain = prompt | model
     return chain.invoke({"question": query, "context": context})
-
-#question="If a government forbids the right to assemble peacefully which articles are violated and why?"
-#retrieved_docs=retrieve_docs(question)
-#print("AI Lawyer: ",answer_query(documents=retrieved_docs, model=llm_model, query=question))
-
-
-
